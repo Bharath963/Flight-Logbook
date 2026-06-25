@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#0d1527">
+  <meta name="description" content="A professional cockpit-themed flight logbook with interactive dashboard HUD, data analysis, and secure cloud synchronization.">
+  <title>Flight Logbook | Glass Cockpit HUD</title>
+  
+  <!-- PWA Manifest & App Icons -->
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  
+  <!-- Premium Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Orbitron:wght@400;500;700;900&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
+  
+  <!-- Custom Core Design System -->
+  <link rel="stylesheet" href="styles.css">
+  
+  <!-- Firebase SDKs (v9 Compat) for easy drop-in compatibility -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+</head>
+<body class="theme-aviation">
+  
+  <!-- Ambient Cockpit Elements -->
+  <div class="hud-grid-background"></div>
+  <div class="hud-scanline"></div>
+  <div class="hud-vignette"></div>
+
+  <!-- Header Dashboard / HUD Control System -->
+  <header class="hud-header">
+    <div class="hud-logo-area">
+      <div class="hud-logo-icon">
+        <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+          <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
+          <line x1="12" y1="22.08" x2="12" y2="12" />
+        </svg>
+      </div>
+      <div class="hud-title-container">
+        <h1>FLIGHT LOGBOOK</h1>
+        <span class="hud-subtitle">FLIGHT LOG & EFIS SIMULATOR v2.4</span>
+      </div>
+    </div>
+    
+    <!-- Navigation & Core Actions -->
+    <div class="hud-controls">
+      <div class="system-status" id="db-status">
+        <span class="status-dot pulsing"></span>
+        <span class="status-text">LOCAL STORAGE MODE</span>
+      </div>
+      <button class="hud-btn btn-settings" id="btn-open-settings" aria-label="Open Cloud Config">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="3"></circle>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+        </svg>
+        <span>CONFIG</span>
+      </button>
+      <button class="hud-btn btn-theme" id="btn-toggle-theme" aria-label="Toggle Futuristic Theme">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+        </svg>
+        <span id="theme-btn-text">FUTURISTIC</span>
+      </button>
+      <button class="hud-btn btn-primary" id="btn-add-flight">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="12" y1="5" x2="12" y2="19"></line>
+          <line x1="5" y1="12" x2="19" y2="12"></line>
+        </svg>
+        <span>LOG FLIGHT</span>
+      </button>
+    </div>
+  </header>
+
+  <main class="hud-container">
+    
+    <!-- SECTION 1: EFIS Dashboard / HUD Cards -->
+    <section class="hud-dashboard" aria-label="Flight Statistics Dashboard">
+      
+      <!-- Card 1: TOTAL HOURS (Hero Card) -->
+      <div class="hud-card card-total-hours">
+        <div class="card-glow"></div>
+        <div class="card-header">
+          <span class="card-tag">EFIS CRITICAL</span>
+          <h3>TOTAL FLIGHT TIME</h3>
+        </div>
+        <div class="card-body">
+          <div class="hud-dial-display">
+            <span class="hud-value big-counter" id="stat-total-hours">0.0</span>
+            <span class="hud-unit">HRS</span>
+          </div>
+          <div class="card-details">
+            <div class="detail-row">
+              <span class="lbl">PIC TOTAL</span>
+              <span class="val highlight-pic" id="sub-pic-total">0.0</span>
+            </div>
+            <div class="detail-row">
+              <span class="lbl">DUAL TOTAL</span>
+              <span class="val highlight-dual" id="sub-dual-total">0.0</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 2: ACTUAL INSTRUMENT -->
+      <div class="hud-card">
+        <div class="card-glow"></div>
+        <div class="card-header">
+          <span class="card-tag">INSTRUMENT</span>
+          <h3>ACTUAL TIME</h3>
+        </div>
+        <div class="card-body">
+          <div class="hud-dial-display">
+            <span class="hud-value" id="stat-actual-time">0.0</span>
+            <span class="hud-unit">HRS</span>
+          </div>
+          <div class="progress-bar-container">
+            <div class="progress-bar-fill" id="bar-actual-time" style="width: 0%"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 3: FSTD INSTRUMENT (Sim) -->
+      <div class="hud-card">
+        <div class="card-glow"></div>
+        <div class="card-header">
+          <span class="card-tag">SIMULATOR</span>
+          <h3>FSTD TIME</h3>
+        </div>
+        <div class="card-body">
+          <div class="hud-dial-display">
+            <span class="hud-value" id="stat-fstd-time">0.0</span>
+            <span class="hud-unit">HRS</span>
+          </div>
+          <div class="progress-bar-container">
+            <div class="progress-bar-fill" id="bar-fstd-time" style="width: 0%"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 4: PIC DAY -->
+      <div class="hud-card">
+        <div class="card-glow"></div>
+        <div class="card-header">
+          <span class="card-tag">PILOT-IN-COMMAND</span>
+          <h3>PIC DAY</h3>
+        </div>
+        <div class="card-body">
+          <div class="hud-dial-display">
+            <span class="hud-value" id="stat-pic-day">0.0</span>
+            <span class="hud-unit">HRS</span>
+          </div>
+          <div class="progress-bar-container">
+            <div class="progress-bar-fill" id="bar-pic-day" style="width: 0%"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 5: PIC NIGHT -->
+      <div class="hud-card">
+        <div class="card-glow"></div>
+        <div class="card-header">
+          <span class="card-tag">PILOT-IN-COMMAND</span>
+          <h3>PIC NIGHT</h3>
+        </div>
+        <div class="card-body">
+          <div class="hud-dial-display">
+            <span class="hud-value" id="stat-pic-night">0.0</span>
+            <span class="hud-unit">HRS</span>
+          </div>
+          <div class="progress-bar-container">
+            <div class="progress-bar-fill" id="bar-pic-night" style="width: 0%"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 6: DUAL DAY -->
+      <div class="hud-card">
+        <div class="card-glow"></div>
+        <div class="card-header">
+          <span class="card-tag">INSTRUCTIONAL</span>
+          <h3>DUAL DAY</h3>
+        </div>
+        <div class="card-body">
+          <div class="hud-dial-display">
+            <span class="hud-value" id="stat-dual-day">0.0</span>
+            <span class="hud-unit">HRS</span>
+          </div>
+          <div class="progress-bar-container">
+            <div class="progress-bar-fill" id="bar-dual-day" style="width: 0%"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 7: DUAL NIGHT -->
+      <div class="hud-card">
+        <div class="card-glow"></div>
+        <div class="card-header">
+          <span class="card-tag">INSTRUCTIONAL</span>
+          <h3>DUAL NIGHT</h3>
+        </div>
+        <div class="card-body">
+          <div class="hud-dial-display">
+            <span class="hud-value" id="stat-dual-night">0.0</span>
+            <span class="hud-unit">HRS</span>
+          </div>
+          <div class="progress-bar-container">
+            <div class="progress-bar-fill" id="bar-dual-night" style="width: 0%"></div>
+          </div>
+        </div>
+      </div>
+      
+    </section>
+
+    <!-- Filter & Tool Panel -->
+    <div class="hud-filter-bar">
+      <div class="search-box">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="11" cy="11" r="8"></circle>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+        </svg>
+        <input type="text" id="search-input" placeholder="Search by type, registration, PIC, details...">
+      </div>
+      <div class="filter-actions">
+        <select id="filter-aircraft-type" class="hud-select">
+          <option value="all">All Aircraft Types</option>
+          <option value="C172">C172 Only</option>
+          <option value="FNPT II">Sim (FNPT II) Only</option>
+        </select>
+        <button class="hud-btn btn-sec" id="btn-export-csv">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+            <polyline points="7 10 12 15 17 10"></polyline>
+            <line x1="12" y1="15" x2="12" y2="3"></line>
+          </svg>
+          CSV Export
+        </button>
+        <button class="hud-btn btn-sec" id="btn-reset-data">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path>
+            <polyline points="3 3 3 8 8 8"></polyline>
+          </svg>
+          Reload Seed
+        </button>
+      </div>
+    </div>
+
+    <!-- SECTION 2: Grid-based Ledger (Table) -->
+    <section class="hud-grid-wrapper" aria-label="Flight Logs Ledger">
+      <div class="table-scroll-container">
+        <table class="logbook-table" id="logbook-table">
+          <thead>
+            <!-- Level 1 Header -->
+            <tr>
+              <th rowspan="3" class="col-date">DATE</th>
+              <th rowspan="3" class="col-type">TYPE</th>
+              <th rowspan="3" class="col-reg">REGISTRATION</th>
+              <th rowspan="3" class="col-pic">PIC</th>
+              <th rowspan="3" class="col-details">DETAILS OF FLIGHT</th>
+              <th colspan="4" class="group-header text-center">INSTRUMENT TIME</th>
+              <th colspan="8" class="group-header text-center">SINGLE ENGINE AIRCRAFT</th>
+              <th colspan="8" class="group-header text-center">MULTI ENGINE AIRCRAFT</th>
+              <th colspan="2" class="group-header text-center">LANDINGS & T/O</th>
+              <th rowspan="3" class="col-remarks">REMARKS</th>
+              <th rowspan="3" class="col-actions">ACTIONS</th>
+            </tr>
+            <!-- Level 2 Header -->
+            <tr>
+              <th rowspan="2" class="sub-header col-nav-aids">NAV AIDS</th>
+              <th rowspan="2" class="sub-header col-place">PLACE</th>
+              <th rowspan="2" class="sub-header col-instr-act">ACTUAL TIME</th>
+              <th rowspan="2" class="sub-header col-instr-fstd">FSTD TIME</th>
+              <th colspan="4" class="sub-header text-center">DAY</th>
+              <th colspan="4" class="sub-header text-center">NIGHT</th>
+              <th colspan="4" class="sub-header text-center">DAY</th>
+              <th colspan="4" class="sub-header text-center">NIGHT</th>
+              <th rowspan="2" class="sub-header col-landing-day">DAY</th>
+              <th rowspan="2" class="sub-header col-landing-night">NIGHT</th>
+            </tr>
+            <!-- Level 3 Header -->
+            <tr>
+              <!-- SE DAY -->
+              <th class="sub-sub-header">DUAL</th>
+              <th class="sub-sub-header">PIC</th>
+              <th class="sub-sub-header">PICUS</th>
+              <th class="sub-sub-header">CO-PILOT</th>
+              <!-- SE NIGHT -->
+              <th class="sub-sub-header">DUAL</th>
+              <th class="sub-sub-header">PIC</th>
+              <th class="sub-sub-header">PICUS</th>
+              <th class="sub-sub-header">CO-PILOT</th>
+              <!-- ME DAY -->
+              <th class="sub-sub-header">DUAL</th>
+              <th class="sub-sub-header">PIC</th>
+              <th class="sub-sub-header">PICUS</th>
+              <th class="sub-sub-header">CO-PILOT</th>
+              <!-- ME NIGHT -->
+              <th class="sub-sub-header">DUAL</th>
+              <th class="sub-sub-header">PIC</th>
+              <th class="sub-sub-header">PICUS</th>
+              <th class="sub-sub-header">CO-PILOT</th>
+            </tr>
+          </thead>
+          <tbody id="logbook-tbody">
+            <!-- Flights rendered dynamically via app.js -->
+          </tbody>
+          <tfoot>
+            <!-- Cumulative running total row -->
+            <tr class="table-totals-row">
+              <td colspan="5">RUNNING TOTALS</td>
+              <td>&mdash;</td>
+              <td>&mdash;</td>
+              <td id="total-instr-actual" class="val-cell">0.0</td>
+              <td id="total-instr-fstd" class="val-cell">0.0</td>
+              
+              <!-- SE Day -->
+              <td id="total-se-day-dual" class="val-cell">0.0</td>
+              <td id="total-se-day-pic" class="val-cell">0.0</td>
+              <td id="total-se-day-picus" class="val-cell">0.0</td>
+              <td id="total-se-day-copilot" class="val-cell">0.0</td>
+              
+              <!-- SE Night -->
+              <td id="total-se-night-dual" class="val-cell">0.0</td>
+              <td id="total-se-night-pic" class="val-cell">0.0</td>
+              <td id="total-se-night-picus" class="val-cell">0.0</td>
+              <td id="total-se-night-copilot" class="val-cell">0.0</td>
+
+              <!-- ME Day -->
+              <td id="total-me-day-dual" class="val-cell">0.0</td>
+              <td id="total-me-day-pic" class="val-cell">0.0</td>
+              <td id="total-me-day-picus" class="val-cell">0.0</td>
+              <td id="total-me-day-copilot" class="val-cell">0.0</td>
+              
+              <!-- ME Night -->
+              <td id="total-me-night-dual" class="val-cell">0.0</td>
+              <td id="total-me-night-pic" class="val-cell">0.0</td>
+              <td id="total-me-night-picus" class="val-cell">0.0</td>
+              <td id="total-me-night-copilot" class="val-cell">0.0</td>
+
+              <td id="total-landings-day" class="val-cell">0</td>
+              <td id="total-landings-night" class="val-cell">0</td>
+              <td>&mdash;</td>
+              <td>&mdash;</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+      <div id="no-flights-message" class="no-data-alert hidden">
+        <svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.5">
+          <line x1="2" y1="2" x2="22" y2="22"></line>
+          <path d="M12 2v6"></path>
+          <path d="m18.7 8-5.1 5.2a3 3 0 0 1-4.2 0l-1.7-1.7a3 3 0 0 1 0-4.2L12.8 2.2a2 2 0 0 1 2.8 0L18.7 5.3a2 2 0 0 1 0 2.7Z"></path>
+        </svg>
+        <p>No flight entries match the criteria. Log your first flight above!</p>
+      </div>
+    </section>
+  </main>
+
+  <!-- MODAL: ADD / EDIT FLIGHT ENTRY -->
+  <div class="hud-modal" id="modal-flight-form" role="dialog" aria-modal="true">
+    <div class="modal-content">
+      <button class="modal-close" id="btn-close-form" aria-label="Close form">&times;</button>
+      <div class="modal-header">
+        <h2 id="modal-form-title">LOG NEW FLIGHT</h2>
+        <span class="hud-subtitle">Aviation Ledger Record Entry</span>
+      </div>
+      <form id="flight-entry-form" class="modal-form">
+        <input type="hidden" id="entry-id">
+        
+        <!-- Form Page / Sections -->
+        <div class="form-grid">
+          <!-- Column 1: Flight Details & Instrument Time -->
+          <div class="form-section">
+            <div class="section-title">FLIGHT DESCRIPTION & IDENTIFICATION</div>
+            
+            <div class="form-row flex-row">
+              <div class="form-group flex-2">
+                <label for="form-date">Flight Date <span class="required">*</span></label>
+                <input type="date" id="form-date" required>
+              </div>
+              <div class="form-group flex-1">
+                <label for="form-type">A/C Type <span class="required">*</span></label>
+                <input type="text" id="form-type" placeholder="e.g. C172" required>
+              </div>
+              <div class="form-group flex-1">
+                <label for="form-reg">Reg <span class="required">*</span></label>
+                <input type="text" id="form-reg" placeholder="e.g. ZS-FRK" required>
+              </div>
+            </div>
+
+            <div class="form-row flex-row">
+              <div class="form-group flex-2">
+                <label for="form-pic">Pilot In Command <span class="required">*</span></label>
+                <input type="text" id="form-pic" placeholder="e.g. SELF or Instructor" required>
+              </div>
+              <div class="form-group flex-3">
+                <label for="form-details">Details of Flight / Exercise</label>
+                <input type="text" id="form-details" placeholder="e.g. FAGC EX 12,13">
+              </div>
+            </div>
+
+            <div class="section-title">INSTRUMENT FLIGHT TIME</div>
+            <div class="form-row flex-row">
+              <div class="form-group">
+                <label for="form-nav-aids">Nav Aids</label>
+                <input type="text" id="form-nav-aids" placeholder="e.g. JSV/LIV">
+              </div>
+              <div class="form-group">
+                <label for="form-place">Place Route</label>
+                <input type="text" id="form-place" placeholder="e.g. FAOR/FALA">
+              </div>
+            </div>
+
+            <div class="form-row flex-row">
+              <div class="form-group">
+                <label for="form-instr-act">Instrument Actual (Hrs)</label>
+                <input type="number" id="form-instr-act" min="0" step="0.1" placeholder="0.0">
+              </div>
+              <div class="form-group">
+                <label for="form-instr-fstd">Instrument FSTD / Sim (Hrs)</label>
+                <input type="number" id="form-instr-fstd" min="0" step="0.1" placeholder="0.0">
+              </div>
+            </div>
+
+            <div class="section-title">LANDINGS & TAKEOFFS</div>
+            <div class="form-row flex-row">
+              <div class="form-group">
+                <label for="form-landings-day">Day Landings</label>
+                <input type="number" id="form-landings-day" min="0" step="1" placeholder="0">
+              </div>
+              <div class="form-group">
+                <label for="form-landings-night">Night Landings</label>
+                <input type="number" id="form-landings-night" min="0" step="1" placeholder="0">
+              </div>
+            </div>
+          </div>
+
+          <!-- Column 2: Single and Multi Engine times -->
+          <div class="form-section">
+            <div class="section-title">SINGLE ENGINE AIRCRAFT (HRS)</div>
+            
+            <div class="sub-section-header">DAY OPERATIONS</div>
+            <div class="form-row grid-4-cols">
+              <div class="form-group">
+                <label for="form-se-day-dual">Dual</label>
+                <input type="number" id="form-se-day-dual" min="0" step="0.1" placeholder="0.0">
+              </div>
+              <div class="form-group">
+                <label for="form-se-day-pic">PIC</label>
+                <input type="number" id="form-se-day-pic" min="0" step="0.1" placeholder="0.0">
+              </div>
+              <div class="form-group">
+                <label for="form-se-day-picus">PICUS</label>
+                <input type="number" id="form-se-day-picus" min="0" step="0.1" placeholder="0.0">
+              </div>
+              <div class="form-group">
+                <label for="form-se-day-copilot">Co-Pilot</label>
+                <input type="number" id="form-se-day-copilot" min="0" step="0.1" placeholder="0.0">
+              </div>
+            </div>
+
+            <div class="sub-section-header">NIGHT OPERATIONS</div>
+            <div class="form-row grid-4-cols">
+              <div class="form-group">
+                <label for="form-se-night-dual">Dual</label>
+                <input type="number" id="form-se-night-dual" min="0" step="0.1" placeholder="0.0">
+              </div>
+              <div class="form-group">
+                <label for="form-se-night-pic">PIC</label>
+                <input type="number" id="form-se-night-pic" min="0" step="0.1" placeholder="0.0">
+              </div>
+              <div class="form-group">
+                <label for="form-se-night-picus">PICUS</label>
+                <input type="number" id="form-se-night-picus" min="0" step="0.1" placeholder="0.0">
+              </div>
+              <div class="form-group">
+                <label for="form-se-night-copilot">Co-Pilot</label>
+                <input type="number" id="form-se-night-copilot" min="0" step="0.1" placeholder="0.0">
+              </div>
+            </div>
+
+            <div class="section-title">MULTI ENGINE AIRCRAFT (HRS)</div>
+            
+            <div class="sub-section-header">DAY OPERATIONS</div>
+            <div class="form-row grid-4-cols">
+              <div class="form-group">
+                <label for="form-me-day-dual">Dual</label>
+                <input type="number" id="form-me-day-dual" min="0" step="0.1" placeholder="0.0">
+              </div>
+              <div class="form-group">
+                <label for="form-me-day-pic">PIC</label>
+                <input type="number" id="form-me-day-pic" min="0" step="0.1" placeholder="0.0">
+              </div>
+              <div class="form-group">
+                <label for="form-me-day-picus">PICUS</label>
+                <input type="number" id="form-me-day-picus" min="0" step="0.1" placeholder="0.0">
+              </div>
+              <div class="form-group">
+                <label for="form-me-day-copilot">Co-Pilot</label>
+                <input type="number" id="form-me-day-copilot" min="0" step="0.1" placeholder="0.0">
+              </div>
+            </div>
+
+            <div class="sub-section-header">NIGHT OPERATIONS</div>
+            <div class="form-row grid-4-cols">
+              <div class="form-group">
+                <label for="form-me-night-dual">Dual</label>
+                <input type="number" id="form-me-night-dual" min="0" step="0.1" placeholder="0.0">
+              </div>
+              <div class="form-group">
+                <label for="form-me-night-pic">PIC</label>
+                <input type="number" id="form-me-night-pic" min="0" step="0.1" placeholder="0.0">
+              </div>
+              <div class="form-group">
+                <label for="form-me-night-picus">PICUS</label>
+                <input type="number" id="form-me-night-picus" min="0" step="0.1" placeholder="0.0">
+              </div>
+              <div class="form-group">
+                <label for="form-me-night-copilot">Co-Pilot</label>
+                <input type="number" id="form-me-night-copilot" min="0" step="0.1" placeholder="0.0">
+              </div>
+            </div>
+
+            <div class="section-title">REMARKS & METADATA</div>
+            <div class="form-group">
+              <label for="form-remarks">Remarks</label>
+              <textarea id="form-remarks" rows="2" placeholder="e.g. Night Rating Test passed successfully."></textarea>
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="hud-btn btn-sec" id="btn-cancel-form">CANCEL</button>
+          <button type="submit" class="hud-btn btn-primary" id="btn-submit-form">COMMIT RECORD</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: CLOUD SETTINGS & CONFIGURATION -->
+  <div class="hud-modal" id="modal-settings" role="dialog" aria-modal="true">
+    <div class="modal-content settings-content">
+      <button class="modal-close" id="btn-close-settings" aria-label="Close settings">&times;</button>
+      <div class="modal-header">
+        <h2>CLOUD DATABASE SETTINGS</h2>
+        <span class="hud-subtitle">Set up Free Cloud Sync (Firebase Firestore)</span>
+      </div>
+      <div class="settings-body">
+        <p class="description-text">
+          By default, all your flight logs are saved locally on your phone/browser. Configure a free Firebase Project below to back up and sync your flight ledger across all your devices.
+        </p>
+        
+        <div class="firebase-instructions">
+          <h4>How to get credentials:</h4>
+          <ol>
+            <li>Go to the <a href="https://console.firebase.google.com/" target="_blank" rel="noopener">Firebase Console</a>.</li>
+            <li>Create a new project (under the Free Spark Plan).</li>
+            <li>Register a new "Web App" inside your Firebase project.</li>
+            <li>Copy the <code>firebaseConfig</code> script snippet and paste the key values below.</li>
+            <li>In the Firebase Console sidebar, go to **Firestore Database** and click **Create Database**, starting in **Test Mode** (or configure public read/write rules).</li>
+          </ol>
+        </div>
+
+        <form id="settings-form" class="modal-form">
+          <div class="form-row">
+            <div class="form-group">
+              <label for="cfg-api-key">API Key (apiKey)</label>
+              <input type="text" id="cfg-api-key" placeholder="AIzaSyA1...">
+            </div>
+            <div class="form-group">
+              <label for="cfg-auth-domain">Auth Domain (authDomain)</label>
+              <input type="text" id="cfg-auth-domain" placeholder="your-project-id.firebaseapp.com">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="cfg-project-id">Project ID (projectId)</label>
+              <input type="text" id="cfg-project-id" placeholder="your-project-id">
+            </div>
+            <div class="form-group">
+              <label for="cfg-storage-bucket">Storage Bucket (storageBucket)</label>
+              <input type="text" id="cfg-storage-bucket" placeholder="your-project-id.appspot.com">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="cfg-messaging-sender-id">Messaging Sender ID (messagingSenderId)</label>
+              <input type="text" id="cfg-messaging-sender-id" placeholder="2195034...">
+            </div>
+            <div class="form-group">
+              <label for="cfg-app-id">App ID (appId)</label>
+              <input type="text" id="cfg-app-id" placeholder="1:2195034:web:e395...">
+            </div>
+          </div>
+          
+          <div class="settings-actions">
+            <button type="button" class="hud-btn btn-danger" id="btn-clear-settings">DISCONNECT CLOUD</button>
+            <button type="submit" class="hud-btn btn-primary">CONNECT & SYNC</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Core Javascript Logic -->
+  <script src="app.js"></script>
+</body>
+</html>
